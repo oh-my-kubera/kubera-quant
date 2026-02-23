@@ -1,0 +1,41 @@
+[project]
+name = "kubera-quant"
+version = "0.1.0"
+description = "Quantitative backtesting and trading for the kubera ecosystem"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+    "httpx>=0.27.0",
+    # Data sources
+    "pykrx>=1.0.45",
+    "ccxt>=4.0",
+    "yfinance>=0.2",
+    # BigQuery
+    "google-cloud-bigquery>=3.0",
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+    # Backtest
+    "vectorbt>=0.26",
+    "numpy>=1.26",
+    "setuptools<81",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+notebook = ["jupyter>=1.0", "matplotlib>=3.8"]
+
+[project.scripts]
+kubera-quant = "quant.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quant"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
