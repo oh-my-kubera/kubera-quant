@@ -50,6 +50,17 @@ def main() -> None:
     bt_parser.add_argument("--end", type=str, default=None, help="End date")
     bt_parser.add_argument("--params", type=str, default=None, help="Strategy params (k1=v1,k2=v2)")
 
+    # kubera-quant optimize
+    opt_parser = subparsers.add_parser("optimize", help="Grid search parameter optimization")
+    opt_parser.add_argument("--strategy", type=str, required=True, help="Strategy name")
+    opt_parser.add_argument("--symbol", type=str, required=True, help="Symbol")
+    opt_parser.add_argument("--market", type=str, required=True, help="Market (krx, crypto, us)")
+    opt_parser.add_argument("--params", type=str, required=True, help="Param ranges (short=3:10:1,long=10:50:5)")
+    opt_parser.add_argument("--start", type=str, default=None, help="Start date")
+    opt_parser.add_argument("--end", type=str, default=None, help="End date")
+    opt_parser.add_argument("--metric", type=str, default="sharpe_ratio", help="Metric to optimize (sharpe_ratio, total_return, max_drawdown)")
+    opt_parser.add_argument("--top", type=int, default=10, help="Show top N results")
+
     # kubera-quant strategy
     subparsers.add_parser("strategy", help="List available strategies")
 
@@ -67,6 +78,9 @@ def main() -> None:
     elif args.command == "backtest":
         from quant.cli.commands import cmd_backtest
         cmd_backtest(args)
+    elif args.command == "optimize":
+        from quant.cli.commands import cmd_optimize
+        cmd_optimize(args)
     elif args.command == "strategy":
         from quant.cli.commands import cmd_strategy
         cmd_strategy(args)

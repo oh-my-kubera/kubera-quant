@@ -250,6 +250,40 @@ def _cmd_backtest_portfolio(args, strategy, cache, params):
     print_portfolio_report(result, strategy_name=args.strategy)
 
 
+def cmd_optimize(args: argparse.Namespace) -> None:
+    """Run parameter optimization."""
+    from quant.core.backtest.optimize import (
+        format_optimize_report,
+        parse_param_ranges,
+        run_optimization,
+    )
+    from quant.core.data.cache import ParquetCache
+    from quant.core.strategy.base import get_strategy
+
+    strategy = get_strategy(args.strategy)
+    if not strategy:
+        print(f"Error: unknown strategy '{args.strategy}'.")
+        sys.exit(1)
+
+    cache = ParquetCache()
+    df = cache.read(market=args.market, symbol=args.symbol)
+    if df.empty:
+        print(f"Error: no cached data for {args.market}/{args.symbol}. Run 'kubera-quant sync' first.")
+        sys.exit(1)
+
+    if args.start:
+        df = df[df["date"] >= args.start]
+    if args.end:
+        df = df[df["date"] <= args.end]
+
+    param_ranges = parse_param_ranges(args.params)
+    result = run_optimization(
+        df, strategy, param_ranges,
+        metric=args.metric, top_n=args.top,
+    )
+    print(format_optimize_report(result))
+
+
 def cmd_strategy(args: argparse.Namespace) -> None:
     """List available strategies."""
     from quant.core.strategy.base import STRATEGIES
