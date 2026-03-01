@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pandas as pd
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import bigquery
 
 TABLE_PREFIX = "ohlcv_"
@@ -141,5 +142,5 @@ class BigQueryStore:
         try:
             df = self.client.query(query).to_dataframe()
             return df["symbol"].tolist()
-        except Exception:
+        except gcp_exceptions.NotFound:
             return []

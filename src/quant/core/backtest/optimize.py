@@ -108,7 +108,7 @@ def run_optimization(
     total_returns = portfolio.total_return().values
     try:
         sharpe_ratios = portfolio.sharpe_ratio().values
-    except Exception:
+    except (ValueError, ZeroDivisionError):
         sharpe_ratios = np.zeros(len(combinations))
     max_drawdowns = portfolio.max_drawdown().values
     total_trades_arr = portfolio.trades.count().values

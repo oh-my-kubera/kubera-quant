@@ -6,10 +6,11 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from quant.core.data.base import DataSource
 from quant.core.data.cache import ParquetCache
 
 
-def get_source(market: str):
+def get_source(market: str) -> DataSource:
     """Get the appropriate DataSource for a market.
 
     Lazy imports to avoid requiring all data source dependencies.

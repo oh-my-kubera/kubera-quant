@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 
 from quant.core.config import quant_dir
@@ -19,7 +21,7 @@ def load_credentials() -> list[dict]:
     try:
         data = json.loads(path.read_text())
         return data if isinstance(data, list) else []
-    except Exception:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return []
 
 
@@ -48,4 +50,7 @@ def get_credential(provider: str) -> dict | None:
 
 
 def _write_credentials(credentials: list[dict]) -> None:
-    credentials_path().write_text(json.dumps(credentials, indent=2))
+    path = credentials_path()
+    path.write_text(json.dumps(credentials, indent=2))
+    if sys.platform != "win32":
+        os.chmod(path, 0o600)

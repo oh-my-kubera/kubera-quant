@@ -144,7 +144,8 @@ def test_list_symbols(mock_bq):
 def test_list_symbols_error(mock_bq):
     mock_client = MagicMock()
     mock_bq.Client.return_value = mock_client
-    mock_client.query.side_effect = Exception("Table not found")
+    from google.api_core import exceptions as gcp_exceptions
+    mock_client.query.side_effect = gcp_exceptions.NotFound("Table not found")
 
     from quant.core.data.bigquery import BigQueryStore
     store = BigQueryStore(project_id="proj", dataset_id="ds")

@@ -122,7 +122,7 @@ def cmd_collect(args: argparse.Namespace) -> None:
         _cmd_collect_local(market, symbols, start, end)
 
 
-def _cmd_collect_local(market, symbols, start, end):
+def _cmd_collect_local(market: str, symbols: list[str], start: str, end: str | None) -> None:
     from quant.core.data.resolver import collect_to_local
 
     for symbol in symbols:
@@ -136,7 +136,7 @@ def _cmd_collect_local(market, symbols, start, end):
     print("Done.")
 
 
-def _cmd_collect_bigquery(market, symbols, start, end, bq_cred, settings):
+def _cmd_collect_bigquery(market: str, symbols: list[str], start: str, end: str | None, bq_cred: dict, settings: object) -> None:
     from quant.core.data.bigquery import BigQueryStore
     from quant.core.data.resolver import get_source
 
@@ -179,6 +179,10 @@ def cmd_sync(args: argparse.Namespace) -> None:
     )
     cache = ParquetCache()
 
+    if not args.all and not args.market:
+        print("Error: specify a market or use --all.")
+        sys.exit(1)
+
     markets = ["krx", "crypto", "us"] if args.all else [args.market]
 
     for market in markets:
@@ -208,9 +212,13 @@ def cmd_backtest(args: argparse.Namespace) -> None:
 
     params = {}
     if args.params:
-        for pair in args.params.split(","):
-            k, v = pair.split("=")
-            params[k.strip()] = float(v.strip())
+        try:
+            for pair in args.params.split(","):
+                k, v = pair.split("=")
+                params[k.strip()] = float(v.strip())
+        except ValueError as e:
+            print(f"Error: malformed --params '{args.params}'. Expected format: key=value,key=value")
+            sys.exit(1)
 
     if args.symbols:
         _cmd_backtest_portfolio(args, strategy, cache, params)
@@ -218,7 +226,7 @@ def cmd_backtest(args: argparse.Namespace) -> None:
         _cmd_backtest_single(args, strategy, cache, params)
 
 
-def _ensure_data(cache, market, symbol, start=None, end=None):
+def _ensure_data(cache: object, market: str, symbol: str, start: str | None = None, end: str | None = None) -> object:
     """Read from cache; auto-fetch from source API if empty."""
     df = cache.read(market=market, symbol=symbol, start=start, end=end)
     if not df.empty:
@@ -234,9 +242,12 @@ def _ensure_data(cache, market, symbol, start=None, end=None):
     return df
 
 
-def _cmd_backtest_single(args, strategy, cache, params):
+def _cmd_backtest_single(args: argparse.Namespace, strategy: object, cache: object, params: dict[str, float]) -> None:
     from quant.core.backtest.engine import run_backtest
     from quant.core.backtest.report import print_report
+    from quant.core.config import get_settings
+
+    settings = get_settings()
 
     df = _ensure_data(cache, args.market, args.symbol, args.start, args.end)
     if df.empty:
@@ -244,14 +255,21 @@ def _cmd_backtest_single(args, strategy, cache, params):
         sys.exit(1)
 
     signal = strategy.generate_signal(df, **params)
-    result = run_backtest(df, signal)
+    result = run_backtest(
+        df, signal,
+        init_cash=settings.backtest_init_cash,
+        fees=settings.backtest_fees,
+        slippage=settings.backtest_slippage,
+    )
     print_report(result, strategy_name=args.strategy, symbol=args.symbol)
 
 
-def _cmd_backtest_portfolio(args, strategy, cache, params):
+def _cmd_backtest_portfolio(args: argparse.Namespace, strategy: object, cache: object, params: dict[str, float]) -> None:
     from quant.core.backtest.engine import run_portfolio_backtest
     from quant.core.backtest.report import print_portfolio_report
+    from quant.core.config import get_settings
 
+    settings = get_settings()
     symbols = [s.strip() for s in args.symbols.split(",")]
 
     dfs = {}
@@ -263,7 +281,12 @@ def _cmd_backtest_portfolio(args, strategy, cache, params):
         dfs[sym] = df.reset_index(drop=True)
 
     signals = {sym: strategy.generate_signal(dfs[sym], **params) for sym in symbols}
-    result = run_portfolio_backtest(dfs, signals)
+    result = run_portfolio_backtest(
+        dfs, signals,
+        init_cash=settings.backtest_init_cash,
+        fees=settings.backtest_fees,
+        slippage=settings.backtest_slippage,
+    )
     print_portfolio_report(result, strategy_name=args.strategy)
 
 
@@ -288,9 +311,15 @@ def cmd_optimize(args: argparse.Namespace) -> None:
         print(f"Error: no data available for {args.market}/{args.symbol}.")
         sys.exit(1)
 
+    from quant.core.config import get_settings
+
+    settings = get_settings()
     param_ranges = parse_param_ranges(args.params)
     result = run_optimization(
         df, strategy, param_ranges,
+        init_cash=settings.backtest_init_cash,
+        fees=settings.backtest_fees,
+        slippage=settings.backtest_slippage,
         metric=args.metric, top_n=args.top,
     )
     print(format_optimize_report(result))
