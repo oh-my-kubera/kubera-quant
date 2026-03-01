@@ -13,8 +13,6 @@ dependencies = [
     "pykrx>=1.0.45",
     "ccxt>=4.0",
     "yfinance>=0.2",
-    # BigQuery
-    "google-cloud-bigquery>=3.0",
     "pandas>=2.0",
     "pyarrow>=14.0",
     # Backtest
@@ -24,6 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+bigquery = ["google-cloud-bigquery>=3.0"]
 dev = ["pytest>=8.0"]
 notebook = ["jupyter>=1.0", "matplotlib>=3.8"]
 

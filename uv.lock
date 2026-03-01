@@ -1709,7 +1709,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "ccxt" },
-    { name = "google-cloud-bigquery" },
     { name = "httpx" },
     { name = "numpy" },
     { name = "pandas" },
@@ -1724,6 +1723,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+bigquery = [
+    { name = "google-cloud-bigquery" },
+]
 dev = [
     { name = "pytest" },
 ]
@@ -1735,7 +1737,7 @@ notebook = [
 [package.metadata]
 requires-dist = [
     { name = "ccxt", specifier = ">=4.0" },
-    { name = "google-cloud-bigquery", specifier = ">=3.0" },
+    { name = "google-cloud-bigquery", marker = "extra == 'bigquery'", specifier = ">=3.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "jupyter", marker = "extra == 'notebook'", specifier = ">=1.0" },
     { name = "matplotlib", marker = "extra == 'notebook'", specifier = ">=3.8" },
@@ -1751,7 +1753,7 @@ requires-dist = [
     { name = "vectorbt", specifier = ">=0.26" },
     { name = "yfinance", specifier = ">=0.2" },
 ]
-provides-extras = ["dev", "notebook"]
+provides-extras = ["bigquery", "dev", "notebook"]
 
 [[package]]
 name = "lark"

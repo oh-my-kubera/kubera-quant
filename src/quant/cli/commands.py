@@ -101,7 +101,7 @@ def _cmd_credential_remove(args: argparse.Namespace) -> None:
 
 
 def cmd_collect(args: argparse.Namespace) -> None:
-    """Collect market data to BigQuery."""
+    """Collect market data."""
     market = args.collect_command
     if market not in ("krx", "crypto", "us"):
         print("Usage: kubera-quant collect {krx,crypto,us}")
@@ -109,28 +109,38 @@ def cmd_collect(args: argparse.Namespace) -> None:
 
     from quant.core.config import get_settings
     from quant.core.credentials import get_credential
-    from quant.core.data.bigquery import BigQueryStore
-
-    bq_cred = get_credential("bigquery")
-    if not bq_cred:
-        print("Error: no BigQuery credential. Run 'kubera-quant credential add bigquery' first.")
-        sys.exit(1)
 
     settings = get_settings()
     symbols = [s.strip() for s in args.symbols.split(",")]
     start = args.start or settings.default_start_date
     end = args.end
 
-    if market == "krx":
-        from quant.core.data.krx import KrxDataSource
-        source = KrxDataSource()
-    elif market == "crypto":
-        from quant.core.data.crypto import CryptoDataSource
-        source = CryptoDataSource()
+    bq_cred = get_credential("bigquery")
+    if bq_cred:
+        _cmd_collect_bigquery(market, symbols, start, end, bq_cred, settings)
     else:
-        from quant.core.data.us import UsDataSource
-        source = UsDataSource()
+        _cmd_collect_local(market, symbols, start, end)
 
+
+def _cmd_collect_local(market, symbols, start, end):
+    from quant.core.data.resolver import collect_to_local
+
+    for symbol in symbols:
+        print(f"Collecting {symbol}...", end=" ", flush=True)
+        df = collect_to_local(market, symbol, start, end)
+        if df.empty:
+            print("no data")
+            continue
+        print(f"{len(df)} rows")
+
+    print("Done.")
+
+
+def _cmd_collect_bigquery(market, symbols, start, end, bq_cred, settings):
+    from quant.core.data.bigquery import BigQueryStore
+    from quant.core.data.resolver import get_source
+
+    source = get_source(market)
     store = BigQueryStore(
         project_id=bq_cred["project_id"],
         dataset_id=settings.bigquery_dataset,
@@ -208,19 +218,30 @@ def cmd_backtest(args: argparse.Namespace) -> None:
         _cmd_backtest_single(args, strategy, cache, params)
 
 
+def _ensure_data(cache, market, symbol, start=None, end=None):
+    """Read from cache; auto-fetch from source API if empty."""
+    df = cache.read(market=market, symbol=symbol, start=start, end=end)
+    if not df.empty:
+        return df
+
+    from quant.core.config import get_settings
+    from quant.core.data.resolver import collect_to_local
+
+    fetch_start = start or get_settings().default_start_date
+    print(f"Fetching {symbol}...", end=" ", flush=True)
+    df = collect_to_local(market, symbol, fetch_start, end, cache)
+    print(f"{len(df)} rows" if not df.empty else "no data")
+    return df
+
+
 def _cmd_backtest_single(args, strategy, cache, params):
     from quant.core.backtest.engine import run_backtest
     from quant.core.backtest.report import print_report
 
-    df = cache.read(market=args.market, symbol=args.symbol)
+    df = _ensure_data(cache, args.market, args.symbol, args.start, args.end)
     if df.empty:
-        print(f"Error: no cached data for {args.market}/{args.symbol}. Run 'kubera-quant sync' first.")
+        print(f"Error: no data available for {args.market}/{args.symbol}.")
         sys.exit(1)
-
-    if args.start:
-        df = df[df["date"] >= args.start]
-    if args.end:
-        df = df[df["date"] <= args.end]
 
     signal = strategy.generate_signal(df, **params)
     result = run_backtest(df, signal)
@@ -235,14 +256,10 @@ def _cmd_backtest_portfolio(args, strategy, cache, params):
 
     dfs = {}
     for sym in symbols:
-        df = cache.read(market=args.market, symbol=sym)
+        df = _ensure_data(cache, args.market, sym, args.start, args.end)
         if df.empty:
-            print(f"Error: no cached data for {args.market}/{sym}. Run 'kubera-quant sync' first.")
+            print(f"Error: no data available for {args.market}/{sym}.")
             sys.exit(1)
-        if args.start:
-            df = df[df["date"] >= args.start]
-        if args.end:
-            df = df[df["date"] <= args.end]
         dfs[sym] = df.reset_index(drop=True)
 
     signals = {sym: strategy.generate_signal(dfs[sym], **params) for sym in symbols}
@@ -266,15 +283,10 @@ def cmd_optimize(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     cache = ParquetCache()
-    df = cache.read(market=args.market, symbol=args.symbol)
+    df = _ensure_data(cache, args.market, args.symbol, args.start, args.end)
     if df.empty:
-        print(f"Error: no cached data for {args.market}/{args.symbol}. Run 'kubera-quant sync' first.")
+        print(f"Error: no data available for {args.market}/{args.symbol}.")
         sys.exit(1)
-
-    if args.start:
-        df = df[df["date"] >= args.start]
-    if args.end:
-        df = df[df["date"] <= args.end]
 
     param_ranges = parse_param_ranges(args.params)
     result = run_optimization(

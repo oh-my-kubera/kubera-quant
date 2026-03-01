@@ -59,6 +59,16 @@ class ParquetCache:
 
         return df.reset_index(drop=True)
 
+    def last_date(self, market: str, symbol: str) -> str | None:
+        """Get the last date in the cache for a symbol."""
+        path = self._path(market, symbol)
+        if not path.exists():
+            return None
+        df = pd.read_parquet(path, columns=["date"])
+        if df.empty:
+            return None
+        return str(df["date"].max())
+
     def list_symbols(self, market: str) -> list[str]:
         """List cached symbols for a market."""
         market_dir = self.base_dir / market

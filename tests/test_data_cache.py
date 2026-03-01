@@ -81,6 +81,23 @@ def test_list_symbols_empty(tmp_path):
     assert cache.list_symbols("krx") == []
 
 
+def test_last_date(tmp_path):
+    cache = ParquetCache(base_dir=tmp_path)
+    assert cache.last_date("krx", "005930") is None
+
+    cache.write("krx", "005930", _sample_df(["2024-01-02", "2024-01-03", "2024-01-04"]))
+    assert cache.last_date("krx", "005930") == "2024-01-04"
+
+
+def test_last_date_after_append(tmp_path):
+    cache = ParquetCache(base_dir=tmp_path)
+    cache.write("krx", "005930", _sample_df(["2024-01-02", "2024-01-03"]))
+    assert cache.last_date("krx", "005930") == "2024-01-03"
+
+    cache.write("krx", "005930", _sample_df(["2024-01-04", "2024-01-05"]))
+    assert cache.last_date("krx", "005930") == "2024-01-05"
+
+
 def test_list_markets(tmp_path):
     cache = ParquetCache(base_dir=tmp_path)
     cache.write("krx", "005930", _sample_df())
