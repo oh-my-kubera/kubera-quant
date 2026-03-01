@@ -42,7 +42,9 @@ def main() -> None:
     # kubera-quant backtest
     bt_parser = subparsers.add_parser("backtest", help="Run backtest")
     bt_parser.add_argument("--strategy", type=str, required=True, help="Strategy name")
-    bt_parser.add_argument("--symbol", type=str, required=True, help="Symbol")
+    symbol_group = bt_parser.add_mutually_exclusive_group(required=True)
+    symbol_group.add_argument("--symbol", type=str, help="Single symbol")
+    symbol_group.add_argument("--symbols", type=str, help="Comma-separated symbols for portfolio backtest")
     bt_parser.add_argument("--market", type=str, required=True, help="Market (krx, crypto, us)")
     bt_parser.add_argument("--start", type=str, default=None, help="Start date")
     bt_parser.add_argument("--end", type=str, default=None, help="End date")

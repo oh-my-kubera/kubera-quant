@@ -186,8 +186,6 @@ def cmd_sync(args: argparse.Namespace) -> None:
 
 def cmd_backtest(args: argparse.Namespace) -> None:
     """Run backtest."""
-    from quant.core.backtest.engine import run_backtest
-    from quant.core.backtest.report import print_report
     from quant.core.data.cache import ParquetCache
     from quant.core.strategy.base import get_strategy
 
@@ -197,6 +195,23 @@ def cmd_backtest(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     cache = ParquetCache()
+
+    params = {}
+    if args.params:
+        for pair in args.params.split(","):
+            k, v = pair.split("=")
+            params[k.strip()] = float(v.strip())
+
+    if args.symbols:
+        _cmd_backtest_portfolio(args, strategy, cache, params)
+    else:
+        _cmd_backtest_single(args, strategy, cache, params)
+
+
+def _cmd_backtest_single(args, strategy, cache, params):
+    from quant.core.backtest.engine import run_backtest
+    from quant.core.backtest.report import print_report
+
     df = cache.read(market=args.market, symbol=args.symbol)
     if df.empty:
         print(f"Error: no cached data for {args.market}/{args.symbol}. Run 'kubera-quant sync' first.")
@@ -207,15 +222,32 @@ def cmd_backtest(args: argparse.Namespace) -> None:
     if args.end:
         df = df[df["date"] <= args.end]
 
-    params = {}
-    if args.params:
-        for pair in args.params.split(","):
-            k, v = pair.split("=")
-            params[k.strip()] = float(v.strip())
-
     signal = strategy.generate_signal(df, **params)
     result = run_backtest(df, signal)
     print_report(result, strategy_name=args.strategy, symbol=args.symbol)
+
+
+def _cmd_backtest_portfolio(args, strategy, cache, params):
+    from quant.core.backtest.engine import run_portfolio_backtest
+    from quant.core.backtest.report import print_portfolio_report
+
+    symbols = [s.strip() for s in args.symbols.split(",")]
+
+    dfs = {}
+    for sym in symbols:
+        df = cache.read(market=args.market, symbol=sym)
+        if df.empty:
+            print(f"Error: no cached data for {args.market}/{sym}. Run 'kubera-quant sync' first.")
+            sys.exit(1)
+        if args.start:
+            df = df[df["date"] >= args.start]
+        if args.end:
+            df = df[df["date"] <= args.end]
+        dfs[sym] = df.reset_index(drop=True)
+
+    signals = {sym: strategy.generate_signal(dfs[sym], **params) for sym in symbols}
+    result = run_portfolio_backtest(dfs, signals)
+    print_portfolio_report(result, strategy_name=args.strategy)
 
 
 def cmd_strategy(args: argparse.Namespace) -> None:
