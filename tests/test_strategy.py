@@ -22,6 +22,8 @@ def _sample_df(n=30):
 def test_strategies_registered():
     assert "sma_cross" in STRATEGIES
     assert "momentum" in STRATEGIES
+    assert "dca" in STRATEGIES
+    assert "rebalance" in STRATEGIES
 
 
 def test_get_strategy():
@@ -75,6 +77,50 @@ def test_momentum_uptrend():
 
     # After lookback period, all should be buy signals
     assert (signal.iloc[5:] == 1.0).all()
+
+
+def test_dca_signal_interval():
+    """DCA should generate buy signals at regular intervals."""
+    df = _sample_df(40)
+    s = get_strategy("dca")
+    signal = s.generate_signal(df, interval=10)
+
+    assert len(signal) == 40
+    # Buy signals at index 0, 10, 20, 30
+    assert signal.iloc[0] == 1.0
+    assert signal.iloc[10] == 1.0
+    assert signal.iloc[20] == 1.0
+    assert signal.iloc[30] == 1.0
+    # No sell signals — DCA only buys
+    assert (signal[signal != 0.0] == 1.0).all()
+
+
+def test_dca_no_sell():
+    """DCA should never produce sell signals."""
+    df = _sample_df(50)
+    s = get_strategy("dca")
+    signal = s.generate_signal(df)
+    assert -1.0 not in signal.values
+
+
+def test_rebalance_signal_shape():
+    df = _sample_df(60)
+    s = get_strategy("rebalance")
+    signal = s.generate_signal(df, interval=10, window=5)
+
+    assert len(signal) == 60
+    assert set(signal.unique()).issubset({-1.0, 0.0, 1.0})
+
+
+def test_rebalance_only_on_interval_days():
+    """Rebalance should only generate signals on interval days."""
+    df = _sample_df(50)
+    s = get_strategy("rebalance")
+    signal = s.generate_signal(df, interval=10, window=5)
+
+    # Non-interval days should all be 0.0
+    non_interval = [i for i in range(len(df)) if i % 10 != 0]
+    assert (signal.iloc[non_interval] == 0.0).all()
 
 
 def test_strategy_description():
